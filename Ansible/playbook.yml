@@ -1,0 +1,117 @@
+---
+
+- name: Provision VPC and EC2 instances
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections: [amazon.aws]
+  vars:
+    vpc_cidr: 10.0.0.0/16
+    subnet_cidr: 10.0.1.0/24
+    instance_type: t2.micro
+  tasks:
+    - name: Create VPC
+      ec2_vpc_net:
+        cidr_block: "{{ vpc_cidr }}"
+        region: us-east-1
+        profile: my_aws_profile
+      register: vpc
+
+    - name: Create subnet
+      ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "{{ subnet_cidr }}"
+        region: us-east-1
+        profile: my_aws_profile
+      register: subnet
+
+    - name: Create security group
+      ec2_group:
+        name: web-server-sg
+        description: Security group for web server instances
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: us-east-1
+        profile: my_aws_profile
+        rules:
+          - proto: tcp
+            from_port: 80
+            to_port: 80
+            cidr_ip: 0.0.0.0/0
+      register: security_group
+
+    - name: Launch web server instances
+      ec2_instance:
+        key_name: my_key
+        instance_type: "{{ instance_type }}"
+        image: ami-0d5d9d301c853a04a
+        region: us-east-1
+        profile: my_aws_profile
+        vpc_subnet_id: "{{ subnet.subnet.id }}"
+        security_group: "{{ security_group.group_id }}"
+        count: 2
+        wait: yes
+        assign_public_ip: yes
+      register: web_server_instances
+
+    - name: Add instances to load balancer
+      elb_target:
+        state: present
+        target_type: instance
+        target_group_arn: "{{ alb_target_group.target_group.arn }}"
+        instances: "{{ web_server_instances.instances }}"
+        region: us-east-1
+        profile: my_aws_profile
+
+    - name: Install NGINX package on instances
+      become: yes
+      become_method: sudo
+      become_user: root
+      package:
+        name: nginx
+        state: latest
+
+    - name: Start NGINX service on instances
+      become: yes
+      become_method: sudo
+      become_user: root
+      service:
+        name: nginx
+        state: started
+        enabled: true
+
+
+- name: Provision Application Load Balancer
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+  - name: Create ALB target group
+    elasticloadbalancingv2_target_group:
+      name: web-server-tg
+      port: 80
+      protocol: HTTP
+      vpc_id: "{{ vpc.vpc.id }}"
+      region: us-east-1
+      profile: my_aws_profile
+    register: alb_target_group
+
+  - name: Create ALB
+    elasticloadbalancingv2_loadbalancer:
+      name: web-server-alb
+      subnets: "{{ subnet.subnet.id }}"
+      security_groups: "{{ security_group.group_id }}"
+      region: us-east-1
+      profile: my_aws_profile
+    register: alb
+    
+  - name: Create listener for ALB
+    elasticloadbalancingv2_listener:
+      load_balancer_arn: "{{ alb.load_balancer.arn }}"
+      port: 80
+      protocol: HTTP
+      default_actions:
+        - type: forward
+          target_group_arn: "{{ alb_target_group.target_group.arn }}"
+      region: us-east-1
+      profile: my_aws_profile
+
