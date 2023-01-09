@@ -1,0 +1,100 @@
+---
+
+- name: Provision VPC and EC2 instances
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections: [amazon.aws]
+  vars:
+    ansible_python_interpreter: /home/codespace/.python/current/bin/python
+    count: 2
+    vpc_cidr: 10.0.0.0/16
+    subnet_cidr: 10.0.1.0/24
+    instance_type: t2.micro
+    region: us-east-1
+    ami: ami-06878d265978313ca
+    vpc_name: my_vpc
+  tasks:
+    - name: Create VPC
+      ec2_vpc_net:
+        name: "{{ vpc_name }}"
+        cidr_block: "{{ vpc_cidr }}"
+        region: "{{ region }}"
+      register: vpc
+
+    - name: Create subnet
+      ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "{{ subnet_cidr }}"
+        region: "{{ region }}"
+      register: subnet
+
+    - name: Create security group
+      ec2_group:
+        name: web-server-sg
+        description: Security group for web server instances
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ region }}"
+        
+        rules:
+          - proto: tcp
+            from_port: 80
+            to_port: 80
+            cidr_ip: 0.0.0.0/0
+      register: security_group
+
+    - name: Create key pair
+      ec2_key:
+        region: "{{ region }}"
+        name: my_key
+      register: key_pair
+
+    - name: Create an EC2 Instance
+      ec2_instance:
+        key_name: "{{ key_pair.key.name }}"
+        instance_type: "{{ instance_type }}"
+        image_id: "{{ ami }}"
+        region: "{{ region }}"
+        
+        vpc_subnet_id: "{{ subnet.subnet.id }}"
+        security_group: "{{ security_group.group_id }}"
+        exact_count: "{{ count }}"
+        wait: yes
+        network:
+          assign_public_ip: true
+        tags:
+          Environment: Prod
+      register: web_server_instances
+
+    # - name: "apt-get update"
+    #   apt:
+    #     update_cache: yes
+    #     cache_valid_time: 3600
+    #   register: result
+    #   until: result is not failed
+    #   retries: 20
+    #   delay: 30
+
+    # - name: Install NGINX package on instances
+    #   apt:
+    #     name: ['nginx']
+    #     state: latest
+
+    # - name: Install nginx
+    #   apt:
+    #     update_cache: yes
+    #     pkg:
+    #     - nginx
+    #   register: result
+    #   until: result is not failed
+    #   retries: 20
+    #   delay: 30
+
+    # - name: Start NGINX service on instances
+    #   become: yes
+    #   become_method: sudo
+    #   become_user: root
+    #   service:
+    #     name: nginx
+    #     state: started
+    #     enabled: true

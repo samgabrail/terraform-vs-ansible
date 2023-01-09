@@ -1,0 +1,64 @@
+---
+
+- name: Provision VPC and EC2 instances
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections: [amazon.aws]
+  vars:
+    ansible_python_interpreter: /home/codespace/.python/current/bin/python
+    count: 1
+    vpc_cidr: 10.0.0.0/16
+    subnet_cidr: 10.0.1.0/24
+    instance_type: t2.micro
+    region: us-east-1
+    ami: ami-06878d265978313ca
+    vpc_name: my_vpc
+
+  tasks:
+    - name: Get VPC ID from name
+      ec2_vpc_net_info:
+        region: "{{ region }}"
+        filters:
+          "tag:Name": "{{ vpc_name }}"
+      register: vpc
+
+    - name: Print VPC ID
+      debug:
+        var: vpc.vpcs[0].vpc_id
+
+    - name: Terminate every running instance in a region. Use with EXTREME caution. This will destroy instances created outside of Ansible.
+      ec2_instance:
+        state: absent
+        image_id: "{{ ami }}"
+        region: "{{ region }}"
+        filters:
+          instance-state-name: running
+
+    - name: Destroy key pair
+      ec2_key:
+        state: absent
+        region: "{{ region }}"
+        name: my_key
+
+    - name: Destroy security group
+      ec2_group:
+        state: absent
+        name: web-server-sg
+        description: Security group for web server instances
+        region: "{{ region }}"
+
+    - name: Destroy subnet
+      ec2_vpc_subnet:
+        state: absent
+        vpc_id: "{{ vpc.vpcs[0].vpc_id }}"
+        cidr: "{{ subnet_cidr }}"
+        region: "{{ region }}"
+
+    - name: Destroy VPC
+      ec2_vpc_net:
+        state: absent
+        name: "{{ vpc_name }}"
+        cidr_block: "{{ vpc_cidr }}"
+        region: "{{ region }}"
+      register: vpc
