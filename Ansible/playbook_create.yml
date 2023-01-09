@@ -64,37 +64,4 @@
           assign_public_ip: true
         tags:
           Environment: Prod
-      register: web_server_instances
-
-    # - name: "apt-get update"
-    #   apt:
-    #     update_cache: yes
-    #     cache_valid_time: 3600
-    #   register: result
-    #   until: result is not failed
-    #   retries: 20
-    #   delay: 30
-
-    # - name: Install NGINX package on instances
-    #   apt:
-    #     name: ['nginx']
-    #     state: latest
-
-    # - name: Install nginx
-    #   apt:
-    #     update_cache: yes
-    #     pkg:
-    #     - nginx
-    #   register: result
-    #   until: result is not failed
-    #   retries: 20
-    #   delay: 30
-
-    # - name: Start NGINX service on instances
-    #   become: yes
-    #   become_method: sudo
-    #   become_user: root
-    #   service:
-    #     name: nginx
-    #     state: started
-    #     enabled: true
+      register: ec_instances
