@@ -56,7 +56,7 @@ variable "project_name" {
 variable "environment" {
   description = "Name of the environment."
   type        = string
-  default     = "prod"
+  default     = "qa"
 }
 
 variable "resource_tags" {

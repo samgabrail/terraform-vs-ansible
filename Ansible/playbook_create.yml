@@ -63,6 +63,5 @@
         network:
           assign_public_ip: true
         tags:
-          Environment: Dev
+          Environment: Prod
       register: ec_instances
-
