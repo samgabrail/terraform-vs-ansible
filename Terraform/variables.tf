@@ -10,7 +10,7 @@ locals {
 variable "webserver_count" {
   description = "Number of web servers to provision"
   type = number
-  default = 
+  default = 2
 }
 
 variable "region" {
@@ -56,7 +56,7 @@ variable "project_name" {
 variable "environment" {
   description = "Name of the environment."
   type        = string
-  default     = "dev"
+  default     = "prod"
 }
 
 variable "resource_tags" {
